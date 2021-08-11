@@ -14,28 +14,28 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.autograd import Variable
 
-# ***** # 
+# ***** #
 # import augmentation policy
-# ***** # 
+# ***** #
 from augs.autoaugment import CIFAR10Policy
 from augs.cutout import Cutout
 
-# ***** # 
+# ***** #
 # import model
-# ***** # 
+# ***** #
 # WRN
 from model.wideresnet import WideResNet
 # SS(shake-shake): 2 options
 from model.shake_shake import ShakeShake
 from model.ss_resnet import ShakeResNet
 # SD(shakedrop)
-from model.shake_pyramidnet import ShakePyramidNet 
+from model.shake_pyramidnet import ShakePyramidNet
 
-# ***** # 
+# ***** #
 # import PAA module
-# ***** # 
-from model.PAA import *   
-from model.A2Cmodel import ActorCritic
+# ***** #
+from augs.PAA import *
+from augs.A2Cmodel import ActorCritic
 
 # used for logging to TensorBoard
 from collections import OrderedDict
@@ -65,7 +65,7 @@ def get_hyper_params(args):
     print('Dataset: {}'.format(args.dataset))
     print('Mainnet: {}'.format(args.model))
     if args.dataset == 'cifar10':
-        if args.model == 'WRN': 
+        if args.model == 'WRN':
             hyper_params['lr'] = 0.1
             hyper_params['WD'] = 5e-4
             hyper_params['epochs'] = 200
@@ -105,13 +105,13 @@ def get_hyper_params(args):
             hyper_params['nesterov'] = True
             hyper_params['momentum'] = 0.9
         else:
-            raise('invalid model !')    
+            raise('invalid model !')
     else:
         raise('invalid dataset !')
 
     if args.aug == 'PAA':
         hyper_params['lr_a2c'] = 1e-4
-    
+
     return hyper_params
 
 def build_model(args, hyper_params):
@@ -141,7 +141,7 @@ def build_model(args, hyper_params):
         model = ShakePyramidNet(depth=110, alpha=270, label=num_classes)
 
     return model
-    
+
 def build_dataloader(args):
     # Data loading code
     normalize = transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]],
@@ -166,7 +166,7 @@ def build_dataloader(args):
             transforms.ToPILImage(),
             transforms.RandomCrop(32),
             transforms.RandomHorizontalFlip(),
-            # CIFAR10Policy(), 
+            # CIFAR10Policy(),
             transforms.ToTensor(),
             Cutout(n_holes=1, length=16),
             normalize,
@@ -179,7 +179,7 @@ def build_dataloader(args):
             transforms.ToPILImage(),
             transforms.RandomCrop(32),
             transforms.RandomHorizontalFlip(),
-            CIFAR10Policy(), 
+            CIFAR10Policy(),
             transforms.ToTensor(),
             Cutout(n_holes=1, length=16),
             normalize,
@@ -192,7 +192,7 @@ def build_dataloader(args):
             transforms.ToPILImage(),
             transforms.RandomCrop(32),
             transforms.RandomHorizontalFlip(),
-            CIFAR10Policy(), 
+            CIFAR10Policy(),
             transforms.ToTensor(),
             # Cutout(n_holes=1, length=16),
             normalize,
@@ -205,7 +205,7 @@ def build_dataloader(args):
             transforms.ToPILImage(),
             transforms.RandomCrop(32),
             transforms.RandomHorizontalFlip(),
-            # CIFAR10Policy(), 
+            # CIFAR10Policy(),
             transforms.ToTensor(),
             # Cutout(n_holes=1, length=16),
             # normalize,
@@ -220,7 +220,7 @@ def build_dataloader(args):
     if not args.is_leinao:
         path_datasets = '../data'
     else:
-        path_datasets = "/data/bitahub/CIFAR/{}".format(args.dataset) 
+        path_datasets = "/data/bitahub/CIFAR/{}".format(args.dataset)
     kwargs = {'num_workers': 4, 'pin_memory': True}
     assert(args.dataset == 'cifar10' or args.dataset == 'cifar100')
     train_loader = torch.utils.data.DataLoader(
@@ -240,7 +240,7 @@ def build_f_output(args):
         output_file = 'output_/{}/{}'.format(args.dataset, args.model)
     if not os.path.exists(output_file):
         os.makedirs(output_file, exist_ok=True)
-    
+
     f_output = open(os.path.join(output_file, '{}.txt'.format(args.aug)), mode='w')
 
     return f_output
@@ -252,14 +252,14 @@ def main():
     f_output = build_f_output(args)
     args.name = args.model
 
-    # ****** # 
+    # ****** #
     # dataloader
-    # ****** # 
+    # ****** #
     train_loader, val_loader = build_dataloader(args)
 
-    # ****** # 
+    # ****** #
     # create model, criterion, optimizer ...
-    # ****** # 
+    # ****** #
     model = build_model(args, hyper_params).cuda()
     # model = model.cuda()
     criterion = nn.CrossEntropyLoss().cuda()
@@ -269,10 +269,10 @@ def main():
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_loader)* hyper_params['epochs'])
     # get the number of model parameters
     print('Number of model parameters: {}'.format(sum([p.data.nelement() for p in model.parameters()])))
-    
+
     if args.aug == 'PAA':
         model_a2c = ActorCritic(len(ops)).cuda()
-        optimizer_a2c = torch.optim.SGD(model_a2c.parameters(), hyper_params['lr_a2c'], 
+        optimizer_a2c = torch.optim.SGD(model_a2c.parameters(), hyper_params['lr_a2c'],
                                     momentum=0.9, nesterov=True,
                                     weight_decay=1e-4)
         scheduler_a2c = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_a2c, len(train_loader)* hyper_params['epochs'])
